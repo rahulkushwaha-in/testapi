@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Text Selection Test</title>
+  <link rel="stylesheet" href="https://unpkg.com/tippy.js@6/dist/tippy.css" />
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 50px;
+    }
+    .tech-term {
+      background-color: yellow;
+      cursor: pointer;
+      position: relative;
+    }
+  </style>
+</head>
+<body>
+  <h1>Welcome to the Text Selection Test Page</h1>
+  <p>
+    This is a sample paragraph to test the text selection functionality. Try selecting any technical term to see its definition in a tooltip.
+  </p>
+  <p>
+    Examples of technical terms include <strong>API</strong>, <strong>JavaScript</strong>, <strong>Node.js</strong>, and <strong>CSS</strong>.
+  </p>
+
+  <!-- (for Tooltips) -->
+  <script src="https://unpkg.com/@popperjs/core@2"></script>
+  <script src="https://unpkg.com/tippy.js@6"></script>
+
+  <script>
+    // Cache to store fetched definitions to minimize API calls
+    const definitionCache = {};
+
+    // Function to fetch definition from API
+    async function fetchDefinition(term) {
+      // Check if definition is already cached
+      if (definitionCache[term]) {
+        return definitionCache[term];
+      }
+
+      try {
+        // For testing purposes, use a local API endpoint
+        const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${term}`);
+        
+        if (!response.ok) {
+          throw new Error('Definition not found.');
+        }
+
+        const data = await response.json();
+        // Extract the definition from the API response
+        const definition = data[0].meanings[0].definitions[0].definition;
+        // Cache the definition
+        definitionCache[term] = definition;
+        return definition;
+      } catch (error) {
+        console.error('Error fetching definition:', error);
+        return 'Definition not available.';
+      }
+    }
+
+    // Function to handle text selection
+    async function handleTextSelection(event) {
+      const selection = window.getSelection();
+      const selectedText = selection.toString().trim();
+
+      // Check if a single word is selected
+      if (selectedText.split(' ').length === 1 && selectedText.length > 0) {
+        const term = selectedText.toLowerCase();
+
+        // Optional: Highlight the selected term by wrapping it in a span
+        const range = selection.getRangeAt(0);
+        const span = document.createElement('span');
+        span.className = 'tech-term';
+        span.textContent = selectedText;
+
+        // Replace the selected text with the span
+        range.deleteContents();
+        range.insertNode(span);
+
+        // Collapse the selection to avoid accidental multiple inserts
+        selection.removeAllRanges();
+        selection.addRange(range);
+
+        // Initialize Tippy.js on the newly created span
+        tippy(span, {
+          content: 'Loading...',
+          allowHTML: true,
+          interactive: true,
+          theme: 'light-border',
+          placement: 'auto',
+          // Fetch and set the definition when the tooltip is about to show
+          onShow(instance) {
+            fetchDefinition(term).then((definition) => {
+              instance.setContent(definition);
+            });
+          },
+          // Optional: Add arrow to the tooltip for better visual connection
+          arrow: true,
+          // Optional: Add a delay for showing and hiding the tooltip
+          delay: [100, 100],
+        });
+
+        // Programmatically show the tooltip
+        span._tippy.show();
+
+        // Optional: Automatically hide the tooltip after 5 seconds
+        setTimeout(() => {
+          span._tippy.hide();
+        }, 5000);
+      }
+    }
+
+    // Add event listener for mouseup (text selection)
+    document.addEventListener('mouseup', handleTextSelection);
+  </script>
+</body>
+</html>
