@@ -14,6 +14,10 @@ const TermSchema = new mongoose.Schema({
         type: [String], // Array of synonyms
         default: [],
     },
+    category:{
+        type:[String],
+        default:[]
+    }
 });
 
 module.exports = mongoose.model('Term', TermSchema);
