@@ -3,18 +3,29 @@
   const CLIENT_ID = '%%CLIENT_ID%%'; // Replaced server-side
   const API_URL = '%%API_URL%%'; // Replaced server-side
 
+  // Cache to store fetched definitions to minimize API calls
+  const definitionCache = {};
+
   // Function to fetch definition of a term
   async function fetchDefinition(term) {
+    // Check if definition is already cached
+    if (definitionCache[term]) {
+      return definitionCache[term];
+    }
+
     try {
       const response = await fetch(`${API_URL}/api/terms/definitions/${term}`, {
         headers: {
           'x-client-id': CLIENT_ID,
         },
       });
+
       if (!response.ok) {
         throw new Error('Definition not found');
       }
+
       const data = await response.json();
+      definitionCache[term] = data.definition; // Cache the definition
       return data.definition;
     } catch (error) {
       console.error('Error fetching definition:', error);
@@ -24,32 +35,54 @@
 
   // Function to display tooltip using Tippy.js
   async function showTooltip(event) {
-    const selectedText = window.getSelection().toString().trim();
+    const selection = window.getSelection();
+    const selectedText = selection.toString().trim();
 
-    if (selectedText.length === 0) return;
+    // Check if a single word is selected
+    if (selectedText.split(' ').length === 1 && selectedText.length > 0) {
+      const term = selectedText.toLowerCase();
 
-    // Fetch definition
-    const definition = await fetchDefinition(selectedText.toLowerCase());
+      // Get the range of the selection
+      const range = selection.getRangeAt(0);
 
-    // Create tooltip element
-    const tooltip = document.createElement('div');
-    tooltip.innerHTML = `<strong>${selectedText}</strong>: ${definition}`;
+      // Create a span to wrap the selected text
+      const span = document.createElement('span');
+      span.className = 'tech-term';
+      span.textContent = selectedText;
 
-    // Initialize Tippy.js tooltip
-    tippy(document.body, {
-      content: tooltip.innerHTML,
-      trigger: 'manual',
-      placement: 'top',
-      allowHTML: true,
-      interactive: true,
-      onShow(instance) {
-        // Position tooltip near the selection
-        const range = window.getSelection().getRangeAt(0);
-        const rect = range.getBoundingClientRect();
-        instance.popper.style.left = `${rect.left + window.scrollX}px`;
-        instance.popper.style.top = `${rect.top + window.scrollY - instance.popper.offsetHeight}px`;
-      },
-    }).show();
+      // Replace the selected text with the span
+      range.deleteContents();
+      range.insertNode(span);
+
+      // Clear the selection to prevent multiple inserts
+      selection.removeAllRanges();
+      selection.addRange(range);
+
+      // Initialize Tippy.js on the newly created span
+      tippy(span, {
+        content: 'Loading...',
+        allowHTML: true,
+        interactive: true,
+        theme: 'light-border',
+        placement: 'auto',
+        arrow: true,
+        delay: [100, 100],
+        onShow(instance) {
+          // Fetch the definition and update the tooltip content
+          fetchDefinition(term).then((definition) => {
+            instance.setContent(`<strong>${selectedText}</strong>: ${definition}`);
+          });
+        },
+      });
+
+      // Programmatically show the tooltip
+      span._tippy.show();
+
+      // Automatically hide the tooltip after 5 seconds
+      setTimeout(() => {
+        span._tippy.hide();
+      }, 5000);
+    }
   }
 
   // Function to load Tippy.js dynamically
